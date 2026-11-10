@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: stock-analysis-agent
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        model: ${OPENAI_MODEL:gpt-4.1-mini}
+        temperature: 0.2
+    tools:
+      limits:
+        # A runaway tool loop would burn market-data credits; one question never needs this many calls.
+        max-total-tool-calls: 24
+  http:
+    clients:
+      connect-timeout: 5s
+      read-timeout: 15s
+  mvc:
+    problemdetails:
+      # Framework errors (malformed JSON, unknown route, wrong type) also come back as problem+json.
+      enabled: true
+
+server:
+  # 8080 and 8085 are taken by other local apps.
+  port: ${PORT:8090}
+
+stockagent:
+  twelvedata:
+    # Quotes and daily price history. "demo" only answers for a few symbols such as AAPL.
+    api-key: ${TWELVEDATA_API_KEY:demo}
+  finnhub:
+    # Fundamentals and news. Leave unset to run on price data alone.
+    api-key: ${FINNHUB_API_KEY:}
+  market-data:
+    history-bars: 320
+    max-news-articles: 8
+    quote-ttl: 60s
+    history-ttl: 15m
+    fundamentals-ttl: 6h
+    news-ttl: 15m

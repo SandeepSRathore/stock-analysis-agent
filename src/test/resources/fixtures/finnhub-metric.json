@@ -1,0 +1,31 @@
+{
+  "metric": {
+    "10DayAverageTradingVolume": 52.5,
+    "52WeekHigh": 355.38,
+    "52WeekLow": 243.42,
+    "52WeekLowDate": "2026-01-14",
+    "beta": 1.29,
+    "peTTM": 34.2,
+    "pbQuarterly": 51.3,
+    "psTTM": 9.1,
+    "epsTTM": 10.25,
+    "dividendYieldIndicatedAnnual": 0.42,
+    "roeTTM": 151.9,
+    "netProfitMarginTTM": 26.9,
+    "grossMarginTTM": 46.2,
+    "operatingMarginTTM": 31.8,
+    "revenueGrowthTTMYoy": 6.4,
+    "epsGrowthTTMYoy": 12.1,
+    "currentRatioQuarterly": 0.89,
+    "totalDebt/totalEquityQuarterly": 1.47
+  },
+  "metricType": "all",
+  "series": {
+    "annual": {
+      "currentRatio": [
+        { "period": "2025-09-27", "v": 0.8933 }
+      ]
+    }
+  },
+  "symbol": "AAPL"
+}

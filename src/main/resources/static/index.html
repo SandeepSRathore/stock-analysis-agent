@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock analysis agent</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF1F4;
+    --surface: #FFFFFF;
+    --ink: #14213D;
+    --muted: #5B6578;
+    --line: #CBD2DC;
+    --accent: #2F4BD8;
+    --accent-ink: #FFFFFF;
+    --up: #0B7A53;
+    --down: #B4232C;
+    --flat: #8A6D1B;
+    --band: #DCE3F7;
+    --ui: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --prose: "Source Serif 4", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0F1729;
+      --surface: #172036;
+      --ink: #E6EAF2;
+      --muted: #9AA6BC;
+      --line: #2B3650;
+      --accent: #8EA2FF;
+      --accent-ink: #0F1729;
+      --up: #4CC38A;
+      --down: #F0717A;
+      --flat: #D9B95B;
+      --band: #26335C;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 16px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+  h1, h2, h3, p, ul, ol, figure, dl, dd { margin: 0; padding: 0; }
+  ul, ol { list-style: none; }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  /* ---------- page frame ---------- */
+  .masthead {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 24px;
+    padding: 18px 24px 14px; border-bottom: 1px solid var(--line);
+  }
+  .masthead h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  .masthead p { font-size: 0.85rem; color: var(--muted); }
+
+  .notices:not(:empty) { margin-bottom: 24px; }
+  .notice {
+    margin-bottom: 10px; padding: 10px 14px; border-left: 3px solid var(--flat);
+    background: var(--surface); font-size: 0.9rem; max-width: 78ch;
+  }
+  .notice code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85em; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .main-column { min-width: 0; }
+  .report-pane { padding: 24px 24px 64px; }
+  .chat-pane { border-top: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 420px; }
+  @media (min-width: 1040px) {
+    .layout { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; }
+    .masthead { padding-left: 48px; padding-right: 48px; }
+    .report-pane { padding: 28px 48px 80px; }
+    .chat-pane { border-top: 0; border-left: 1px solid var(--line); position: sticky; top: 0; height: 100vh; }
+  }
+
+  /* ---------- ticker form ---------- */
+  .ask { display: flex; gap: 10px; align-items: stretch; max-width: 460px; }
+  .ask label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .ask input {
+    flex: 1; min-width: 0; padding: 12px 14px; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 4px;
+  }
+  .ask input::placeholder { color: var(--muted); font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .button {
+    padding: 0 20px; min-height: 44px; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 4px;
+  }
+  .button:disabled { opacity: 0.55; cursor: progress; }
+  .hint { margin-top: 10px; color: var(--muted); font-size: 0.9rem; max-width: 60ch; }
+
+  .progress { margin-top: 28px; max-width: 60ch; color: var(--muted); }
+  .progress-bar { height: 3px; margin-top: 12px; background: var(--line); overflow: hidden; }
+  .progress-bar::after { content: ""; display: block; height: 100%; width: 30%; background: var(--accent); animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+  @media (prefers-reduced-motion: reduce) { .progress-bar::after { animation: none; width: 100%; opacity: 0.5; } }
+
+  .problem { margin-top: 24px; padding: 14px 16px; max-width: 70ch; background: var(--surface); border-left: 3px solid var(--down); }
+  .problem strong { display: block; margin-bottom: 2px; }
+
+  /* ---------- report ---------- */
+  .report { margin-top: 36px; max-width: 860px; }
+  .identity { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+  .identity h2 { font-size: 1.1rem; font-weight: 600; }
+  .identity .where { color: var(--muted); font-size: 0.9rem; }
+  .price-line { margin-top: 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .price { font-size: 2.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .change { font-size: 1.05rem; font-weight: 600; }
+  .asof { color: var(--muted); font-size: 0.85rem; }
+  .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--flat); }
+
+  .verdict { margin-top: 28px; }
+  .stance { font-weight: 700; font-size: 0.95rem; }
+  .headline { margin-top: 6px; font-family: var(--prose); font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; max-width: 30ch; text-wrap: balance; }
+
+  /* The range rail: where the price sits in its 52-week range. */
+  .rail { margin-top: 56px; }
+  .rail-track { position: relative; height: 14px; background: var(--line); border-radius: 7px; }
+  .rail-band { position: absolute; top: 0; bottom: 0; background: var(--band); border-left: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+  .rail-tick { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; background: var(--ink); }
+  .rail-tick.long { background: var(--muted); }
+  .rail-tick.long::after { content: ""; position: absolute; left: -3px; bottom: -8px; width: 8px; height: 2px; background: var(--muted); }
+  .rail-price { position: absolute; top: -9px; width: 4px; height: 32px; margin-left: -2px; background: var(--accent); border-radius: 2px; }
+  .rail-price span { position: absolute; bottom: 100%; left: 50%; transform: translateX(var(--shift, -50%)); padding-bottom: 6px; white-space: nowrap; font-weight: 700; color: var(--accent); }
+  .rail-ends { display: flex; justify-content: space-between; margin-top: 16px; font-size: 0.85rem; color: var(--muted); }
+  .rail-ends b { color: var(--ink); font-weight: 600; }
+  .rail-key { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 0.85rem; color: var(--muted); }
+  .rail-key li { display: flex; align-items: center; gap: 7px; }
+  .rail-key i { display: inline-block; flex: none; }
+  .key-50 { width: 2px; height: 14px; background: var(--ink); }
+  .key-200 { position: relative; width: 2px; height: 14px; margin: 0 3px; background: var(--muted); }
+  .key-200::after { content: ""; position: absolute; left: -3px; bottom: 0; width: 8px; height: 2px; background: var(--muted); }
+  .key-band { width: 16px; height: 10px; background: var(--band); border-left: 1px solid var(--accent); border-right: 1px solid var(--accent); }
+
+  .prose { font-family: var(--prose); font-size: 1.09rem; line-height: 1.6; max-width: 66ch; }
+  .summary { margin-top: 36px; }
+  .views { margin-top: 36px; display: grid; gap: 28px; }
+  .views h3, .section h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+
+  .balance { margin-top: 40px; display: grid; gap: 28px 40px; padding: 24px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  @media (min-width: 640px) { .balance { grid-template-columns: 1fr 1fr; } }
+  .balance h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 10px; }
+  .balance li { position: relative; padding-left: 18px; margin-bottom: 8px; font-size: 0.97rem; }
+  .balance li::before { content: ""; position: absolute; left: 0; top: 0.5em; width: 8px; height: 8px; border-radius: 50%; }
+  .for li::before { background: var(--up); }
+  .against li::before { background: var(--down); }
+
+  .section { margin-top: 40px; }
+  .section > p.lede { color: var(--muted); font-size: 0.9rem; margin-bottom: 14px; max-width: 66ch; }
+  .gaps li { margin-bottom: 6px; font-size: 0.95rem; padding-left: 14px; border-left: 2px solid var(--flat); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 7px 0; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+  th { font-weight: 400; color: var(--muted); padding-right: 16px; }
+  td { text-align: right; font-weight: 600; white-space: nowrap; }
+  caption { text-align: left; font-weight: 700; font-size: 0.95rem; padding-bottom: 4px; }
+  .figures { display: grid; gap: 28px 40px; }
+  @media (min-width: 640px) { .figures { grid-template-columns: 1fr 1fr; } }
+
+  .signals li { margin-bottom: 6px; font-size: 0.95rem; }
+  .signals .caveat { color: var(--muted); font-style: italic; }
+
+  .news li { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .news a { color: var(--ink); font-weight: 600; text-decoration-color: var(--line); text-underline-offset: 3px; }
+  .news a:hover { text-decoration-color: var(--accent); }
+  .news small { display: block; color: var(--muted); font-size: 0.82rem; margin-top: 2px; }
+
+  .trace li { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; }
+  .trace .why { grid-column: 1 / -1; color: var(--muted); font-size: 0.85rem; }
+  .trace .ok { color: var(--up); font-weight: 600; } .trace .failed { color: var(--down); font-weight: 600; }
+  .fineprint { margin-top: 32px; color: var(--muted); font-size: 0.85rem; max-width: 66ch; }
+
+  /* ---------- chat ---------- */
+  .chat-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+  .chat-head h2 { font-size: 1rem; font-weight: 700; }
+  .link-button { background: none; border: 0; padding: 0; color: var(--accent); font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .messages { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .starter { color: var(--muted); font-size: 0.92rem; }
+  .starter ul { margin-top: 10px; display: grid; gap: 8px; }
+  .starter button { width: 100%; text-align: left; padding: 9px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; color: var(--ink); }
+  .starter button:hover { border-color: var(--accent); }
+  .msg { max-width: 100%; font-size: 0.95rem; overflow-wrap: anywhere; }
+  .msg.you { align-self: flex-end; max-width: 88%; padding: 8px 12px; background: var(--accent); color: var(--accent-ink); border-radius: 12px 12px 2px 12px; }
+  .msg.agent p { margin-bottom: 8px; } .msg.agent p:last-child { margin-bottom: 0; }
+  .msg.agent h4 { margin: 12px 0 4px; font-size: 0.95rem; }
+  .msg.agent ul, .msg.agent ol { margin: 0 0 8px 20px; } .msg.agent ul { list-style: disc; } .msg.agent ol { list-style: decimal; }
+  .msg.agent code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88em; }
+  .lookups { margin-top: 6px; color: var(--muted); font-size: 0.8rem; }
+  .msg.error { padding: 8px 12px; border-left: 3px solid var(--down); background: var(--paper); }
+  .msg.thinking { color: var(--muted); font-style: italic; }
+  .composer { display: flex; gap: 8px; padding: 12px 20px 18px; border-top: 1px solid var(--line); }
+  .composer label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .composer textarea { flex: 1; min-width: 0; resize: none; padding: 10px 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="main-column">
+  <header class="masthead">
+    <h1>Stock analysis agent</h1>
+    <p id="status">Checking data sources…</p>
+  </header>
+  <main class="report-pane">
+    <div class="notices" id="notices"></div>
+    <form class="ask" id="analyze-form" autocomplete="off">
+      <label for="symbol">Ticker symbol</label>
+      <input id="symbol" name="symbol" placeholder="Ticker, e.g. AAPL" maxlength="20" required autocapitalize="characters" spellcheck="false">
+      <button class="button" id="analyze-button" type="submit">Analyze</button>
+    </form>
+    <p class="hint" id="hint">Enter a ticker to get a written assessment with the figures it is based on. Prices and indicators are computed from market data; the language model only interprets them.</p>
+
+    <div class="progress" id="progress" hidden>
+      <p>Looking up the price, technicals, fundamentals and news, then writing the report. This usually takes about ten seconds.</p>
+      <div class="progress-bar"></div>
+    </div>
+    <div class="problem" id="problem" role="alert" hidden></div>
+    <article class="report" id="report" hidden></article>
+  </main>
+  </div>
+
+  <aside class="chat-pane" aria-label="Chat with the agent">
+    <div class="chat-head">
+      <h2>Ask the agent</h2>
+      <button class="link-button" id="new-chat" type="button" hidden>Start a new conversation</button>
+    </div>
+    <div class="messages" id="messages" aria-live="polite">
+      <div class="starter" id="starter">
+        <p>Ask anything about a stock. The agent looks up live data before it answers and remembers the conversation.</p>
+        <ul>
+          <li><button type="button">Is AAPL in an uptrend right now?</button></li>
+          <li><button type="button">How volatile has AAPL been over the past year?</button></li>
+          <li><button type="button">What happened to AAPL's price over the last five sessions?</button></li>
+        </ul>
+      </div>
+    </div>
+    <form class="composer" id="chat-form">
+      <label for="question">Your question</label>
+      <textarea id="question" rows="2" maxlength="2000" placeholder="Ask about a stock…" required></textarea>
+      <button class="button" id="send-button" type="submit">Send</button>
+    </form>
+  </aside>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+
+  // ---------- small helpers ----------
+  /** Builds an element. Text always goes in as text, never as HTML. */
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (value === null || value === undefined || value === false) continue;
+      if (key === "class") node.className = value;
+      else if (key === "style") node.style.cssText = value;
+      else node.setAttribute(key, value);
+    }
+    for (const child of children.flat()) {
+      if (child === null || child === undefined || child === false) continue;
+      node.append(child.nodeType ? child : document.createTextNode(String(child)));
+    }
+    return node;
+  }
+
+  const has = v => v !== null && v !== undefined;
+  const num = (v, digits = 2) => has(v) ? v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits }) : "n/a";
+  const signed = (v, digits = 2) => has(v) ? (v > 0 ? "+" : "") + num(v, digits) + "%" : "n/a";
+  const pct = (v, digits = 1) => has(v) ? num(v, digits) + "%" : "n/a";
+  const tone = v => !has(v) || v === 0 ? "flat" : v > 0 ? "up" : "down";
+  const big = v => !has(v) ? "n/a" : v >= 1e9 ? num(v / 1e9, 2) + "B" : v >= 1e6 ? num(v / 1e6, 1) + "M" : v.toLocaleString("en-US");
+  const money = (v, currency) => {
+    if (!has(v)) return "n/a";
+    try { return v.toLocaleString("en-US", { style: "currency", currency: currency || "USD", maximumFractionDigits: Math.abs(v) < 1 ? 4 : 2 }); }
+    catch { return num(v); }
+  };
+  const day = iso => has(iso) ? new Date(iso + (iso.length === 10 ? "T00:00:00" : "")).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const moment = iso => has(iso) ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+  const safeUrl = url => { try { const u = new URL(url); return u.protocol === "https:" || u.protocol === "http:" ? u.href : null; } catch { return null; } };
+
+  async function api(path, options) {
+    let response;
+    try { response = await fetch(path, options); }
+    catch { throw { title: "Can't reach the server", detail: "Check that the application is still running, then try again." }; }
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw { title: body?.title || "Request failed", detail: body?.detail || `The server answered with status ${response.status}.` };
+    }
+    return body;
+  }
+
+  const TOOL_NAMES = {
+    getQuote: "Latest price",
+    getTechnicalAnalysis: "Technical analysis",
+    getRecentPriceHistory: "Daily price history",
+    getCompanyFundamentals: "Company fundamentals",
+    getCompanyNews: "Recent news",
+  };
+
+  // ---------- status ----------
+  api("/api/status").then(status => {
+    $("status").textContent = `Model ${status.model}, prices from ${status.priceDataProvider}`
+      + (status.companyDataProvider ? `, fundamentals and news from ${status.companyDataProvider}` : "");
+    const notices = $("notices");
+    if (status.priceDataLimitedToDemoSymbols) {
+      notices.append(el("p", { class: "notice" }, "Prices come from the Twelve Data demo key, which only covers AAPL and a few other symbols. Set ",
+        el("code", {}, "TWELVEDATA_API_KEY"), " and restart to analyze any ticker."));
+    }
+    if (!status.companyDataProvider) {
+      notices.append(el("p", { class: "notice" }, "Fundamentals and news are off, so reports cover price action only. Set ",
+        el("code", {}, "FINNHUB_API_KEY"), " and restart to turn them on."));
+    }
+  }).catch(() => { $("status").textContent = "Server not reachable"; });
+
+  // ---------- analysis ----------
+  $("analyze-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const symbol = $("symbol").value.trim().toUpperCase();
+    if (!symbol) return;
+    const button = $("analyze-button");
+    button.disabled = true;
+    button.textContent = "Analyzing…";
+    $("problem").hidden = true;
+    $("report").hidden = true;
+    $("hint").hidden = true;
+    $("progress").hidden = false;
+    try {
+      const analysis = await api("/api/analysis/" + encodeURIComponent(symbol));
+      renderReport(analysis);
+      $("report").hidden = false;
+      document.title = `${analysis.symbol} analysis`;
+    } catch (problem) {
+      $("problem").replaceChildren(el("strong", {}, problem.title), problem.detail);
+      $("problem").hidden = false;
+    } finally {
+      $("progress").hidden = true;
+      button.disabled = false;
+      button.textContent = "Analyze";
+    }
+  });
+
+  function renderReport(a) {
+    const { report: r, evidence: e } = a;
+    const q = e.quote, t = e.technicals, f = e.fundamentals, n = e.news;
+    const currency = q?.currency || t?.currency || "USD";
+    const outlook = { BULLISH: ["Bullish", "up"], BEARISH: ["Bearish", "down"], NEUTRAL: ["Neutral", "flat"] }[r.outlook] || [r.outlook, "flat"];
+    const parts = [];
+
+    parts.push(el("header", {},
+      el("div", { class: "identity" },
+        el("h2", {}, `${r.companyName || q?.name || a.symbol} (${a.symbol})`),
+        q?.exchange && el("span", { class: "where" }, q.exchange)),
+      q && el("div", { class: "price-line" },
+        el("span", { class: "price" }, money(q.price, currency)),
+        el("span", { class: "change " + tone(q.change) }, `${q.change > 0 ? "+" : ""}${num(q.change)} (${signed(q.changePercent)})`),
+        el("span", { class: "asof" }, q.marketOpen ? `Market open, as of ${moment(q.asOf)}` : `At the close on ${day(q.tradingDay)}`))));
+
+    parts.push(el("div", { class: "verdict" },
+      el("p", { class: "stance " + outlook[1] }, `${outlook[0]}, ${String(r.confidence).toLowerCase()} confidence`),
+      el("p", { class: "headline" }, r.headline)));
+
+    if (t?.range && has(t.range.high52Week) && has(t.range.low52Week) && t.range.high52Week > t.range.low52Week) {
+      parts.push(rangeRail(t, currency));
+    }
+
+    parts.push(el("p", { class: "prose summary" }, r.summary));
+    parts.push(el("div", { class: "views" },
+      el("section", {}, el("h3", {}, "Price action"), el("p", { class: "prose" }, r.technicalView)),
+      el("section", {}, el("h3", {}, "The business"), el("p", { class: "prose" }, r.fundamentalView)),
+      el("section", {}, el("h3", {}, "Recent news"), el("p", { class: "prose" }, r.newsView))));
+
+    parts.push(el("div", { class: "balance" },
+      el("section", { class: "for" }, el("h3", {}, "In its favour"), el("ul", {}, (r.strengths || []).map(s => el("li", {}, s)))),
+      el("section", { class: "against" }, el("h3", {}, "Against it"), el("ul", {}, (r.risks || []).map(s => el("li", {}, s))))));
+
+    if (r.dataGaps?.length) {
+      parts.push(el("section", { class: "section" }, el("h3", {}, "What the agent could not get"),
+        el("ul", { class: "gaps" }, r.dataGaps.map(g => el("li", {}, g)))));
+    }
+
+    const tables = [];
+    if (t) {
+      tables.push(table("Trend and momentum", [
+        ["Trend", t.trend.replaceAll("_", " ").toLowerCase()],
+        ["Price against 50-day average", signed(t.movingAverages.priceVsSma50Percent)],
+        ["Price against 200-day average", signed(t.movingAverages.priceVsSma200Percent)],
+        ["RSI (14)", has(t.momentum.rsi14) ? `${num(t.momentum.rsi14, 1)}, ${String(t.momentum.rsiZone).toLowerCase()}` : "n/a"],
+        ["MACD histogram", num(t.momentum.macdHistogram, 3)],
+      ]));
+      tables.push(table("Returns", [
+        ["1 week", signed(t.returns.oneWeekPercent), tone(t.returns.oneWeekPercent)],
+        ["1 month", signed(t.returns.oneMonthPercent), tone(t.returns.oneMonthPercent)],
+        ["3 months", signed(t.returns.threeMonthPercent), tone(t.returns.threeMonthPercent)],
+        ["6 months", signed(t.returns.sixMonthPercent), tone(t.returns.sixMonthPercent)],
+        ["1 year", signed(t.returns.oneYearPercent), tone(t.returns.oneYearPercent)],
+      ]));
+      tables.push(table("Risk", [
+        ["Annualised volatility (30 days)", pct(t.volatility.annualizedVolatility30dPercent)],
+        ["Average daily range (ATR 14)", has(t.volatility.atr14) ? `${money(t.volatility.atr14, currency)}, ${pct(t.volatility.atrPercentOfPrice, 2)} of price` : "n/a"],
+        ["Largest fall in the past year", pct(t.volatility.maxDrawdown1yPercent)],
+        ["Volume against 20-day average", has(t.volume.relativeVolume) ? num(t.volume.relativeVolume) + "×" : "n/a"],
+      ]));
+    }
+    if (f) {
+      tables.push(table("Valuation and business", [
+        ["Industry", f.industry || "n/a"],
+        ["Market value", has(f.marketCapMillions) ? `${big(f.marketCapMillions * 1e6)} ${f.currency || currency}` : "n/a"],
+        ["Price to earnings", num(f.peRatioTtm, 1)],
+        ["Price to sales", num(f.priceToSalesTtm, 1)],
+        ["Net margin", pct(f.netMarginPercent)],
+        ["Return on equity", pct(f.returnOnEquityPercent)],
+        ["Revenue growth, year on year", signed(f.revenueGrowthYoyPercent, 1)],
+        ["Earnings per share growth", signed(f.epsGrowthYoyPercent, 1)],
+        ["Debt to equity", num(f.debtToEquity)],
+        ["Dividend yield", pct(f.dividendYieldPercent, 2)],
+      ]));
+    }
+    if (tables.length) {
+      parts.push(el("section", { class: "section" },
+        el("h3", {}, "The figures behind this report"),
+        el("p", { class: "lede" }, `Computed from market data${t ? ` up to ${day(t.asOf)}` : ""}, not written by the language model. Check any number in the text against these.`),
+        el("div", { class: "figures" }, tables)));
+    }
+
+    if (t && (t.signals.length || t.caveats.length)) {
+      parts.push(el("section", { class: "section" }, el("h3", {}, "Signals in the price data"),
+        el("ul", { class: "signals" }, t.signals.map(s => el("li", {}, s)), t.caveats.map(c => el("li", { class: "caveat" }, c)))));
+    }
+
+    if (n?.articles?.length) {
+      parts.push(el("section", { class: "section" }, el("h3", {}, `News from the last ${n.daysCovered} days`),
+        el("ul", { class: "news" }, n.articles.map(article => {
+          const href = safeUrl(article.url);
+          return el("li", {},
+            href ? el("a", { href, target: "_blank", rel: "noopener noreferrer" }, article.headline) : el("b", {}, article.headline),
+            el("small", {}, [article.source, moment(article.publishedAt)].filter(Boolean).join(", ")));
+        }))));
+    }
+
+    parts.push(el("section", { class: "section" }, el("h3", {}, "What the agent looked up"),
+      el("ul", { class: "trace" }, a.toolCalls.map(call => el("li", {},
+        el("span", {}, `${TOOL_NAMES[call.tool] || call.tool} for ${call.symbol}`),
+        el("span", { class: call.succeeded ? "ok" : "failed" }, call.succeeded ? "Received" : "Unavailable"),
+        !call.succeeded && el("span", { class: "why" }, call.error))))));
+
+    parts.push(el("p", { class: "fineprint" }, `${a.disclaimer} Written by ${a.model} on ${moment(a.generatedAt)}.`));
+    $("report").replaceChildren(...parts);
+  }
+
+  function table(title, rows) {
+    return el("table", {}, el("caption", {}, title),
+      el("tbody", {}, rows.map(([label, value, cls]) => el("tr", {}, el("th", { scope: "row" }, label), el("td", { class: cls || null }, value)))));
+  }
+
+  /** The 52-week range as a rail, with the price, both moving averages and the last 20 sessions marked. */
+  function rangeRail(t, currency) {
+    const low = t.range.low52Week, high = t.range.high52Week;
+    const at = v => Math.min(100, Math.max(0, (v - low) / (high - low) * 100));
+    const pricePos = at(t.lastClose);
+    // Keep the price label inside the rail when the marker sits near either end.
+    const shift = pricePos < 12 ? "0%" : pricePos > 88 ? "-100%" : "-50%";
+    const key = [];
+    const track = el("div", { class: "rail-track" });
+    if (has(t.range.support20Day) && has(t.range.resistance20Day)) {
+      const from = at(t.range.support20Day), to = at(t.range.resistance20Day);
+      track.append(el("div", { class: "rail-band", style: `left:${from}%;width:${Math.max(to - from, 0.5)}%` }));
+      key.push(el("li", {}, el("i", { class: "key-band" }), `Last 20 sessions, ${num(t.range.support20Day)} to ${num(t.range.resistance20Day)}`));
+    }
+    if (has(t.movingAverages.sma200)) {
+      track.append(el("div", { class: "rail-tick long", style: `left:${at(t.movingAverages.sma200)}%` }));
+      key.push(el("li", {}, el("i", { class: "key-200" }), `200-day average ${num(t.movingAverages.sma200)}`));
+    }
+    if (has(t.movingAverages.sma50)) {
+      track.append(el("div", { class: "rail-tick", style: `left:${at(t.movingAverages.sma50)}%` }));
+      key.push(el("li", {}, el("i", { class: "key-50" }), `50-day average ${num(t.movingAverages.sma50)}`));
+    }
+    track.append(el("div", { class: "rail-price", style: `left:${pricePos}%;--shift:${shift}` }, el("span", {}, money(t.lastClose, currency))));
+    const description = `Price ${num(t.lastClose)} sits ${num(pricePos, 0)}% of the way from the 52-week low of ${num(low)} to the high of ${num(high)}.`;
+    return el("figure", { class: "rail", role: "img", "aria-label": description },
+      track,
+      el("div", { class: "rail-ends" }, el("span", {}, "52-week low ", el("b", {}, num(low))), el("span", {}, "52-week high ", el("b", {}, num(high)))),
+      el("ul", { class: "rail-key" }, key));
+  }
+
+  // ---------- chat ----------
+  let conversationId = null;
+  const messages = $("messages");
+
+  /** Minimal Markdown for answers: everything is HTML-escaped first, then a few safe tags are added. */
+  function markdown(text) {
+    const escape = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const inline = s => escape(s)
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+    const html = [];
+    let list = null, paragraph = [];
+    const flush = () => {
+      if (paragraph.length) { html.push("<p>" + paragraph.join("<br>") + "</p>"); paragraph = []; }
+      if (list) { html.push(`</${list}>`); list = null; }
+    };
+    for (const raw of text.split(/\r?\n/)) {
+      const line = raw.trimEnd();
+      let m;
+      if (!line.trim()) { flush(); }
+      else if ((m = line.match(/^#{1,6}\s+(.*)$/))) { flush(); html.push("<h4>" + inline(m[1]) + "</h4>"); }
+      else if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (list !== "ul") { flush(); html.push("<ul>"); list = "ul"; } html.push("<li>" + inline(m[1]) + "</li>"); }
+      else if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { flush(); html.push("<ol>"); list = "ol"; } html.push("<li>" + inline(m[1]) + "</li>"); }
+      else { if (list) flush(); paragraph.push(inline(line)); }
+    }
+    flush();
+    return html.join("");
+  }
+
+  function addMessage(node) {
+    $("starter")?.remove();
+    messages.append(node);
+    messages.scrollTop = messages.scrollHeight;
+    return node;
+  }
+
+  async function ask(question) {
+    const send = $("send-button");
+    send.disabled = true;
+    addMessage(el("div", { class: "msg you" }, question));
+    const thinking = addMessage(el("div", { class: "msg thinking" }, "Looking up data…"));
+    try {
+      const reply = await api("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, message: question }),
+      });
+      conversationId = reply.conversationId;
+      $("new-chat").hidden = false;
+      const answer = el("div", { class: "msg agent" });
+      answer.innerHTML = markdown(reply.answer);
+      if (reply.toolCalls.length) {
+        const lookups = reply.toolCalls.map(call =>
+          `${(TOOL_NAMES[call.tool] || call.tool).toLowerCase()} for ${call.symbol}${call.succeeded ? "" : " (unavailable)"}`);
+        answer.append(el("p", { class: "lookups" }, "Looked up: " + lookups.join("; ")));
+      }
+      thinking.replaceWith(answer);
+    } catch (problem) {
+      thinking.replaceWith(el("div", { class: "msg error", role: "alert" }, el("strong", {}, problem.title + ". "), problem.detail));
+    } finally {
+      send.disabled = false;
+      messages.scrollTop = messages.scrollHeight;
+      $("question").focus();
+    }
+  }
+
+  $("chat-form").addEventListener("submit", event => {
+    event.preventDefault();
+    const question = $("question").value.trim();
+    if (!question || $("send-button").disabled) return;
+    $("question").value = "";
+    ask(question);
+  });
+  $("question").addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      $("chat-form").requestSubmit();
+    }
+  });
+  $("starter").addEventListener("click", event => {
+    if (event.target.tagName === "BUTTON") ask(event.target.textContent);
+  });
+  $("new-chat").addEventListener("click", () => {
+    conversationId = null;
+    messages.replaceChildren(el("p", { class: "starter" }, "New conversation started. The agent no longer remembers the earlier one."));
+    $("new-chat").hidden = true;
+    $("question").focus();
+  });
+})();
+</script>
+</body>
+</html>

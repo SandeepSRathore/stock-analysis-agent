@@ -1,0 +1,35 @@
+[
+  {
+    "category": "company",
+    "datetime": 1794150000,
+    "headline": "Apple supplier lifts outlook on strong iPhone demand",
+    "id": 101,
+    "image": "https://example.com/a.jpg",
+    "related": "AAPL",
+    "source": "Reuters",
+    "summary": "A key supplier raised its full-year forecast, citing stronger than expected orders.",
+    "url": "https://example.com/news/101"
+  },
+  {
+    "category": "company",
+    "datetime": 1794240000,
+    "headline": "  Apple shares hit record ahead of earnings  ",
+    "id": 102,
+    "image": "",
+    "related": "AAPL",
+    "source": "MarketWatch",
+    "summary": "Shares closed at an all-time high.",
+    "url": "https://example.com/news/102"
+  },
+  {
+    "category": "company",
+    "datetime": 1794200000,
+    "headline": "",
+    "id": 103,
+    "image": "",
+    "related": "AAPL",
+    "source": "Unknown",
+    "summary": "An item with no headline, which the client should drop.",
+    "url": "https://example.com/news/103"
+  }
+]

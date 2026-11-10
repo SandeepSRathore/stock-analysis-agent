@@ -1,0 +1,15 @@
+target/
+*.log
+
+# Local secrets: API keys belong in environment variables or this untracked file
+.env
+application-local.yml
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+.DS_Store
